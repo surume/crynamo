@@ -18,12 +18,17 @@ module Crynamo
     end
 
     def dynamodb_value_map(value)
+      pp "value -----------------------------------------"
+      pp value
       case value
+        when Nil
+          {DynamoDB::TypeDescriptor.null => true}
         when AWS::DynamoDB::DDB::KeyConditionExpression
           dynamodb_value_map(value.value)
         when String
           {DynamoDB::TypeDescriptor.string => value}
         when Number
+          pp "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"
           {DynamoDB::TypeDescriptor.number => value.to_s}
         when Bool
           {DynamoDB::TypeDescriptor.bool => value}
@@ -33,11 +38,26 @@ module Crynamo
           {DynamoDB::TypeDescriptor.number_set => value.map(&.to_s)}
         when Array, Tuple
           {DynamoDB::TypeDescriptor.list => value}
-        when Hash, NamedTuple
-          {DynamoDB::TypeDescriptor.map => value}
-        when Nil
-          {DynamoDB::TypeDescriptor.null => true}
+        when NamedTuple
+          inner_values = value.to_h.select { |k, v|
+            !v.nil?
+          }.map { |k, v|
+            { k => dynamodb_value_map(v) }
+          }.reduce { |acc, v| acc.merge(v) }
+          pp "naizou-------------------------------------"
+          pp inner_values
+          {DynamoDB::TypeDescriptor.map => inner_values}
+        when Hash
+          inner_values = value.select { |k, v|
+            !v.nil?
+          }.map { |k, v|
+            { k => dynamodb_value_map(v) }
+          }.reduce { |acc, v| acc.merge(v) }
+          pp "naizou-------------------------------------"
+          pp inner_values
+          {DynamoDB::TypeDescriptor.map => inner_values}
         else
+          pp "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
           raise MarshallException.new "Couldn't marshal Crystal type #{typeof(value)} to DynamoDB type"
         end
     end
@@ -45,11 +65,33 @@ module Crynamo
     # Converts a `NamedTuple` to a DynamoDB `Hash` representation
     def to_dynamo(tuple : NamedTuple) : Hash
       hash = tuple.to_h
-      keys = tuple.keys.to_a
+      # keys = tuple.keys.to_a
+      keys = Array(Symbol).new
+      pp keys
 
-      dynamodb_values = hash.values.map do |value|
-        dynamodb_value_map(value)
+      dynamodb_values = hash.select { |k, v|
+        case v
+        when Nil
+          false
+        when ""
+          false
+        when Array
+          # false
+          v.size > 0
+        else
+          true
+        end
+      }.map do |k, v|
+        # { v => dynamodb_value_map(v) }
+        pp keys
+        keys.push(k)
+        dynamodb_value_map(v)
       end
+        # .reduce { |acc, va| acc.merge(va) }
+      # pp "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHOGE"
+      # pp keys
+      # pp dynamodb_values
+      # pp "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHOGE"
 
       Hash.zip(keys, dynamodb_values)
     end
@@ -74,6 +116,7 @@ module Crynamo
       marshalled = to_dynamo(tuple)
       marshalled.each do |key, value|
         case value
+        when Nil
         when AWS::DynamoDB::DDB::KeyConditionExpression
           expression_attribute_values[":#{key}"] = value.value
         else
@@ -127,8 +170,8 @@ module Crynamo
       Hash.zip(keys, crystal_values)
     end
 
-    def from_dynamo(items : Array(Hash)) : Array(Hash(String, Array(Float32) | Array(JSON::Any) | Array(String) | Bool | Float32 | JSON::Any | Nil))
-      items.map{ |item| from_dynamo(item) }
+    def from_dynamo(items : Array(Hash)) : Array(Hash(String, Array(Float32) | Array(JSON::Any) | Array(String) | Number | Bool | Float32 | JSON::Any | Nil))
+      items.map{ |item| from_dynamo(item) } unless items.nil?
     end
   end
 end
