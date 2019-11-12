@@ -33,7 +33,6 @@ module Crynamo
         ExpressionAttributeValues: expression_attribute_values,
         Limit: 100,
       }
-      pp query
 
       result = request(AWS::DynamoDB::Operation::Query, query)
       # DynamoDB will return us an empty JSON object if nothing exists
@@ -65,7 +64,6 @@ module Crynamo
         TableName: table,
         Item:      marshalled,
       }
-      pp query
 
       request(AWS::DynamoDB::Operation::PutItem, query)
       return nil
@@ -98,8 +96,6 @@ module Crynamo
       )
       status_code = response.status_code
       body = response.body
-      pp response
-      pp body
 
       # Note: Happy path, return what DynamoDB gives us
       return body if status_code == 200
