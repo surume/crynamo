@@ -19,39 +19,37 @@ module Crynamo
 
     def dynamodb_value_map(value)
       case value
-        when Nil
-          {DynamoDB::TypeDescriptor.null => true}
-        when AWS::DynamoDB::DDB::KeyConditionExpression
-          dynamodb_value_map(value.value)
-        when String
-          {DynamoDB::TypeDescriptor.string => value}
-        when Number
-          {DynamoDB::TypeDescriptor.number => value.to_s}
-        when Bool
-          {DynamoDB::TypeDescriptor.bool => value}
-        when Array(String)
-          {DynamoDB::TypeDescriptor.string_set => value}
-        when Array(Int8), Array(Int16), Array(Int32), Array(Int64), Array(Float32), Array(Float64)
-          {DynamoDB::TypeDescriptor.number_set => value.map(&.to_s)}
-        when Array, Tuple
-          {DynamoDB::TypeDescriptor.list => value}
-        when NamedTuple
-          inner_values = value.to_h.select { |k, v|
-            !v.nil?
-          }.map { |k, v|
-            { k => dynamodb_value_map(v) }
-          }.reduce { |acc, v| acc.merge(v) }
-          {DynamoDB::TypeDescriptor.map => inner_values}
-        when Hash
-          inner_values = value.select { |k, v|
-            !v.nil?
-          }.map { |k, v|
-            { k => dynamodb_value_map(v) }
-          }.reduce { |acc, v| acc.merge(v) }
-          {DynamoDB::TypeDescriptor.map => inner_values}
-        else
-          raise MarshallException.new "Couldn't marshal Crystal type #{typeof(value)} to DynamoDB type"
-        end
+      when Nil
+        {DynamoDB::TypeDescriptor.null => true}
+      when AWS::DynamoDB::DDB::KeyConditionExpression
+        dynamodb_value_map(value.value)
+      when String
+        {DynamoDB::TypeDescriptor.string => value}
+      when Number
+        {DynamoDB::TypeDescriptor.number => value.to_s}
+      when Bool
+        {DynamoDB::TypeDescriptor.bool => value}
+      when Array(String)
+        {DynamoDB::TypeDescriptor.string_set => value}
+      when Array(Int8), Array(Int16), Array(Int32), Array(Int64), Array(Float32), Array(Float64)
+        {DynamoDB::TypeDescriptor.number_set => value.map(&.to_s)}
+      when Array, Tuple
+        {DynamoDB::TypeDescriptor.list => value}
+      when NamedTuple
+        inner_values = value.map { |k, v|
+          {k => dynamodb_value_map(v)}
+        }.reduce { |acc, v| acc.merge(v) }
+        {DynamoDB::TypeDescriptor.map => inner_values}
+      when Hash
+        inner_values = value.select { |k, v|
+          !v.nil?
+        }.map { |k, v|
+          {k => dynamodb_value_map(v)}
+        }.reduce { |acc, v| acc.merge(v) }
+        {DynamoDB::TypeDescriptor.map => inner_values}
+      else
+        raise MarshallException.new "Couldn't marshal Crystal type #{typeof(value)} to DynamoDB type"
+      end
     end
 
     # Converts a `NamedTuple` to a DynamoDB `Hash` representation
@@ -79,7 +77,7 @@ module Crynamo
     end
 
     # { product_id: product.id }
-    def to_expressions(tuple : NamedTuple)# : Tuple(String, Hash(String, Hash(String, String | Hash(String, String) | Hash(String, Bool))))
+    def to_expressions(tuple : NamedTuple) # : Tuple(String, Hash(String, Hash(String, String | Hash(String, String) | Hash(String, Bool))))
       key_condition_expression = tuple.keys.to_a.map do |key|
         v = tuple[key]
         case v
@@ -153,7 +151,7 @@ module Crynamo
     end
 
     def from_dynamo(items : Array(Hash)) : Array(Hash(String, Array(Float32) | Array(JSON::Any) | Array(String) | Number | Bool | Float32 | JSON::Any | Nil))
-      items.map{ |item| from_dynamo(item) } unless items.nil?
+      items.map { |item| from_dynamo(item) } unless items.nil?
     end
   end
 end
